@@ -154,15 +154,33 @@ jobs:
       id: build_script
       run: ./build_env.sh
 
+    - name: Check for Project ZIP
+      id: check_project_zip
+      run: |
+        if [ -f meu-jogo-libgdx.zip ]; then
+          echo "PROJECT_ZIP_EXISTS=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "PROJECT_ZIP_EXISTS=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Upload Project ZIP (se criado)
-      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-libgdx.zip
+      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: project-zip
         path: meu-jogo-libgdx.zip
 
+    - name: Check for APK ZIP
+      id: check_apk_zip
+      run: |
+        if [ -f meu-jogo-debug.apk.zip ]; then
+          echo "APK_ZIP_EXISTS=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "APK_ZIP_EXISTS=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Upload APK ZIP (se gerado)
-      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-debug.apk.zip
+      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && steps.check_apk_zip.outputs.APK_ZIP_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: apk-zip
