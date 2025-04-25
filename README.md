@@ -39,8 +39,8 @@ create_libgdx_project() {
     return 1
   fi
 
-  # Comando para criar o projeto LibGDX (você pode precisar ajustar a versão)
-  java -jar gdx-setup.jar -name "$PROJECT_NAME" -package com.meugame -mainClass MeuJogo -androidSdk .
+  # Comando para criar o projeto LibGDX (removendo a dependência do Android SDK neste momento)
+  java -jar gdx-setup.jar -name "$PROJECT_NAME" -package com.meugame -mainClass MeuJogo
 
   if [ $? -eq 0 ]; then
     log "Projeto LibGDX criado com sucesso na pasta '$PROJECT_NAME'."
@@ -105,7 +105,7 @@ if create_libgdx_project; then
   # Compactar o projeto
   zip_project
 
-  # Tentar compilar o APK (ciente de que pode falhar)
+  # Tentar compilar o APK (ciente de que pode falhar sem Android SDK configurado)
   build_apk
 else
   log "A criação do projeto LibGDX falhou. As etapas subsequentes serão ignoradas."
