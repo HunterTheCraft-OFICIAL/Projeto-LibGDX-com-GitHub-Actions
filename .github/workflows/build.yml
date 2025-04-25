@@ -1,6 +1,6 @@
 name: Build LibGDX Environment
 
-on: [push] # Ou outro evento que você preferir (por exemplo, workflow_dispatch para execução manual)
+on: [push] # Ou outro evento que você preferir
 
 jobs:
   build:
@@ -14,17 +14,23 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '17' # Ou outra versão compatível
+        java-version: '17'
 
     - name: Download LibGDX Liftoff
-      run: wget https://github.com/libgdx/gdx-liftoff/releases/download/v1.13.1.3/gdx-liftoff-1.13.1.3.jar
+      run: wget https://github.com/libgdx/gdx-liftoff/releases/download/v1.13.1.3/gdx-liftoff-1.13.1.3.jar -O gdx-setup.jar
 
     - name: Make script executable
       run: chmod +x build_env.sh
 
-    - name: Run build script
+    - name: Run build script and collect info
       id: build_script
-      run: ./build_env.sh
+      run: ./build_env.sh > build.log 2>&1 # Redireciona a saída para build.log
+
+    - name: Upload Log File
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
 
     - name: Check for Project ZIP
       id: check_project_zip
@@ -36,7 +42,7 @@ jobs:
         fi
 
     - name: Upload Project ZIP (se criado)
-      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
+      if: steps.build_script.outcome == 'success' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: project-zip
@@ -52,20 +58,14 @@ jobs:
         fi
 
     - name: Upload APK ZIP (se gerado)
-      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && steps.check_apk_zip.outputs.APK_ZIP_EXISTS == 'true'
+      if: steps.build_script.outcome == 'success' && steps.check_apk_zip.outputs.APK_ZIP_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: apk-zip
         path: meu-jogo-debug.apk.zip
 
-    - name: Upload Logs
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs
-        path: build.log
-
     - name: Create Release (with Log Mention)
-      if: always() # Executa sempre, mesmo que as etapas anteriores falhem
+      if: always()
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,6 +75,6 @@ jobs:
         body: |
           Logs da execução do workflow: ${{ github.run_id }}
 
-          Você pode encontrar o arquivo de log completo como um artefato na página desta execução do workflow.
+          Você pode encontrar o arquivo de log completo como um artefato ('build-log') na página desta execução do workflow.
         draft: false
         prerelease: true

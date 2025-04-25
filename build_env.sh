@@ -1,19 +1,29 @@
 #!/bin/bash
 
 # --- Configurações ---
-PROJECT_NAME="meu-jogo-libgdx" # Nome padrão do projeto (pode ser alterado)
+PROJECT_NAME="meu-jogo-libgdx"
 OUTPUT_ZIP="${PROJECT_NAME}.zip"
 LOG_FILE="build.log"
 
 # --- Funções ---
 
-# Função para registrar mensagens no log
 log() {
   TIMESTAMP=$(date +%Y-%m-%d_%H:%M:%S)
-  echo "[${TIMESTAMP}] $1" >> "$LOG_FILE"
+  echo "[${TIMESTAMP}] $1"
 }
 
-# Função para criar o projeto LibGDX
+collect_environment_info() {
+  log "--- Informações do Ambiente ---"
+  log "Sistema Operacional: $(uname -a)"
+  log "Java Version: $(java -version 2>&1)"
+  log "Gradle Version: $(./gradlew --version 2>&1)" # Tenta obter a versão do Gradle (se existir)
+  log "Estrutura de diretórios:"
+  tree -L 2 . # Lista a estrutura de diretórios (requer 'tree' instalado)
+  log "--- Downloads ---"
+  ls -l gdx-setup.jar # Lista informações do arquivo baixado
+  log "-----------------------------"
+}
+
 create_libgdx_project() {
   log "Iniciando a criação do projeto LibGDX..."
   if ! command -v java &> /dev/null; then
@@ -21,7 +31,6 @@ create_libgdx_project() {
     return 1
   fi
 
-  # Comando para criar o projeto LibGDX (removendo a dependência do Android SDK neste momento)
   java -jar gdx-setup.jar -name "$PROJECT_NAME" -package com.meugame -mainClass MeuJogo
 
   if [ $? -eq 0 ]; then
@@ -33,7 +42,6 @@ create_libgdx_project() {
   fi
 }
 
-# Função para compactar o projeto em um arquivo ZIP
 zip_project() {
   log "Compactando o projeto para '$OUTPUT_ZIP'..."
   zip -r "$OUTPUT_ZIP" "$PROJECT_NAME"
@@ -46,7 +54,6 @@ zip_project() {
   fi
 }
 
-# Função para tentar compilar o APK (pode falhar sem Android SDK configurado)
 build_apk() {
   log "Tentando compilar o APK..."
   cd "$PROJECT_NAME/android" || {
@@ -54,17 +61,15 @@ build_apk() {
     return 1
   }
 
-  # Este comando pode variar dependendo da sua configuração e versão do Gradle
   ./gradlew assembleDebug
 
   if [ $? -eq 0 ]; then
     APK_PATH="build/outputs/apk/debug/android-debug.apk"
     if [ -f "$APK_PATH" ]; then
       log "APK compilado com sucesso em '$APK_PATH'."
-      # Podemos tentar zipar o APK também
-      APK_OUTPUT="meu-jogo-debug.apk.zip"
-      zip "$APK_OUTPUT" "$APK_PATH" && log "APK também compactado como '$APK_OUTPUT'."
-      cd ../..
+      APK_OUTPUT="meu-jogo-debug.apk" # Salva o APK sem ZIP por enquanto
+      cp "$APK_PATH" "../../../$APK_OUTPUT" # Copia para o diretório raiz
+      cd ../../..
       return 0
     else
       log "A compilação do APK parece ter ocorrido sem erros, mas o arquivo APK não foi encontrado em '$APK_PATH'."
@@ -82,19 +87,20 @@ build_apk() {
 
 log "Início do script de criação do ambiente de desenvolvimento."
 
+# Coletar informações do ambiente
+collect_environment_info
+
 # Criar o projeto LibGDX
 if create_libgdx_project; then
   # Compactar o projeto
   zip_project
 
-  # Tentar compilar o APK (ciente de que pode falhar sem Android SDK configurado)
+  # Tentar compilar o APK
   build_apk
 else
   log "A criação do projeto LibGDX falhou. As etapas subsequentes serão ignoradas."
 fi
 
-# Sempre salvar o arquivo de log
 log "Fim do script. O log detalhado foi salvo em '$LOG_FILE'."
 
-# Para que o GitHub Actions possa salvar o log como um artefato
 echo "LOG_FILE=$LOG_FILE" >> $GITHUB_OUTPUT
