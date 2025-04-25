@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Endereço: './build_env.sh'
+
 # --- Configurações ---
 PROJECT_NAME="meu-jogo-libgdx"
 OUTPUT_ZIP="${PROJECT_NAME}.zip"

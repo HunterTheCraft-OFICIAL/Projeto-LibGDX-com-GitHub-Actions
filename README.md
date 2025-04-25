@@ -18,6 +18,8 @@ Crie um arquivo chamado `build_env.sh` na raiz do seu repositório e cole o segu
 ```bash
 #!/bin/bash
 
+# Endereço: './build_env.sh'
+
 # --- Configurações ---
 PROJECT_NAME="meu-jogo-libgdx"
 OUTPUT_ZIP="${PROJECT_NAME}.zip"
@@ -134,7 +136,10 @@ Agora, siga estes passos para criar o workflow que executará o script acima:
 ```bash
 name: Build LibGDX Environment
 
-on: [push] # Ou outro evento que você preferir
+on: [push]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -150,6 +155,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Install 'tree'
+      run: sudo apt-get update && sudo apt-get install -y tree # Instala o 'tree' para o log
+
     - name: Download LibGDX Liftoff
       run: wget https://github.com/libgdx/gdx-liftoff/releases/download/v1.13.1.3/gdx-liftoff-1.13.1.3.jar -O gdx-setup.jar
 
@@ -158,7 +166,7 @@ jobs:
 
     - name: Run build script and collect info
       id: build_script
-      run: ./build_env.sh > build.log 2>&1 # Redireciona a saída para build.log
+      run: ./build_env.sh > build.log 2>&1
 
     - name: Upload Log File
       uses: actions/upload-artifact@v4
@@ -182,21 +190,27 @@ jobs:
         name: project-zip
         path: meu-jogo-libgdx.zip
 
-    - name: Check for APK ZIP
-      id: check_apk_zip
+    - name: Check for APK
+      id: check_apk
       run: |
-        if [ -f meu-jogo-debug.apk.zip ]; then
-          echo "APK_ZIP_EXISTS=true" >> "$GITHUB_OUTPUT"
+        if [ -f meu-jogo-debug.apk ]; then
+          echo "APK_EXISTS=true" >> "$GITHUB_OUTPUT"
         else
-          echo "APK_ZIP_EXISTS=false" >> "$GITHUB_OUTPUT"
+          echo "APK_EXISTS=false" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Upload APK ZIP (se gerado)
-      if: steps.build_script.outcome == 'success' && steps.check_apk_zip.outputs.APK_ZIP_EXISTS == 'true'
+    - name: Upload APK (se gerado)
+      if: steps.build_script.outcome == 'success' && steps.check_apk.outputs.APK_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: apk-zip
-        path: meu-jogo-debug.apk.zip
+        name: debug-apk
+        path: meu-jogo-debug.apk
+
+    - name: Upload Liftoff JAR
+      uses: actions/upload-artifact@v4
+      with:
+        name: liftoff-jar
+        path: gdx-setup.jar
 
     - name: Create Release (with Log Mention)
       if: always()
@@ -210,6 +224,9 @@ jobs:
           Logs da execução do workflow: ${{ github.run_id }}
 
           Você pode encontrar o arquivo de log completo como um artefato ('build-log') na página desta execução do workflow.
+          O JAR do Liftoff também está disponível como um artefato ('liftoff-jar').
+          ${{ steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true' && 'O ZIP do projeto está disponível como um artefato (project-zip).' || '' }}
+          ${{ steps.check_apk.outputs.APK_EXISTS == 'true' && 'O APK de debug está disponível como um artefato (debug-apk).' || '' }}
         draft: false
         prerelease: true
 ```
