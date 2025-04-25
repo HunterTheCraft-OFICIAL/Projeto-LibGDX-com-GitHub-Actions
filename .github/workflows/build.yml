@@ -33,7 +33,7 @@ jobs:
         path: ${{ steps.build_script.outputs.LOG_FILE == '' && 'meu-jogo-libgdx.zip' || 'meu-jogo-libgdx.zip' }}
 
     - name: Upload APK ZIP (se gerado)
-      if: steps.build_script.outputs.LOG_FILE == '' && fileExists('meu-jogo-debug.apk.zip')
+      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-debug.apk.zip
       uses: actions/upload-artifact@v4
       with:
         name: apk-zip
