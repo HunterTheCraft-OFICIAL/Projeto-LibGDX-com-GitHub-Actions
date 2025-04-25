@@ -2,6 +2,9 @@ name: Build LibGDX Environment
 
 on: [push] # Ou outro evento que você preferir
 
+permissions:
+  contents: write # Adiciona permissão de escrita para criar releases
+
 jobs:
   build:
     runs-on: ubuntu-latest
