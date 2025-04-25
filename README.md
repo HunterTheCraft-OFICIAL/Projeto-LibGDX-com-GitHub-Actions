@@ -45,13 +45,18 @@ collect_environment_info() {
 }
 
 create_libgdx_project() {
-  log "Iniciando a criação do projeto LibGDX..."
+  log "Iniciando a criação do projeto LibGDX (não interativo)..."
   if ! command -v java &> /dev/null; then
     log "Erro: Java não encontrado no sistema. A criação do projeto LibGDX requer Java."
     return 1
   fi
 
-  java -jar gdx-setup.jar -name "$PROJECT_NAME" -package com.meugame -mainClass MeuJogo
+  java -jar gdx-setup.jar \
+    -name "$PROJECT_NAME" \
+    -package com.meugame \
+    -mainClass MeuJogo \
+    -backends desktop,android,ios,web \
+    -extensions extensions/controllers,extensions/freetype,extensions/ashley,extensions/bullet
 
   if [ $? -eq 0 ]; then
     log "Projeto LibGDX criado com sucesso na pasta '$PROJECT_NAME'."
