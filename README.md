@@ -166,7 +166,9 @@ jobs:
 
     - name: Run build script and collect info
       id: build_script
-      run: ./build_env.sh > build.log 2>&1
+      run: |
+        ./build_env.sh
+        cat build.log # Exibe o conteúdo do build.log no output do workflow
 
     - name: Upload Log File
       uses: actions/upload-artifact@v4
