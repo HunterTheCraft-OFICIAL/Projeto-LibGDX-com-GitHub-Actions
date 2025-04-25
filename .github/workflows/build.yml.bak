@@ -76,12 +76,6 @@ jobs:
         name: liftoff-jar
         path: gdx-setup.jar
 
-    - name: Run build script and collect info
-      id: build_script
-      run: |
-        ./build_env.sh
-        cat build.log # Exibe o conteúdo do build.log no output do workflow
-
     - name: Create Release (with Log Mention)
       if: always()
       uses: actions/create-release@v1
