@@ -126,7 +126,7 @@ Agora, siga estes passos para criar o workflow que executará o script acima:
  * Copie e cole o seguinte conteúdo no arquivo build.yml:
 
 ```bash
-   name: Build LibGDX Environment
+name: Build LibGDX Environment
 
 on: [push] # Ou outro evento que você preferir (por exemplo, workflow_dispatch para execução manual)
 
@@ -144,8 +144,8 @@ jobs:
         distribution: 'temurin'
         java-version: '17' # Ou outra versão compatível
 
-    - name: Download LibGDX Setup
-      run: wget [https://github.com/libgdx/libgdx/releases/download/1.12.1/gdx-setup.jar](https://github.com/libgdx/libgdx/releases/download/1.12.1/gdx-setup.jar) # Verifique a versão mais recente em [https://libgdx.com/download/](https://libgdx.com/download/)
+    - name: Download LibGDX Liftoff
+      run: wget https://github.com/libgdx/libgdx/releases/download/1.13.1/gdx-liftoff-1.13.1.jar # Use a versão mais recente
 
     - name: Make script executable
       run: chmod +x build_env.sh
@@ -154,14 +154,15 @@ jobs:
       id: build_script
       run: ./build_env.sh
 
-    - name: Upload Project ZIP
+    - name: Upload Project ZIP (se criado)
+      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-libgdx.zip
       uses: actions/upload-artifact@v4
       with:
         name: project-zip
-        path: ${{ steps.build_script.outputs.LOG_FILE == '' && 'meu-jogo-libgdx.zip' || 'meu-jogo-libgdx.zip' }}
+        path: meu-jogo-libgdx.zip
 
     - name: Upload APK ZIP (se gerado)
-      if: steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-debug.apk.zip
+      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-debug.apk.zip
       uses: actions/upload-artifact@v4
       with:
         name: apk-zip
@@ -171,7 +172,21 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: build-logs
-        path: ${{ steps.build_script.outputs.LOG_FILE }}
+        path: build.log
+
+    - name: Create Release (with Logs)
+      if: always() # Executa sempre, mesmo que as etapas anteriores falhem
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.run_id }}
+        release_name: Build Log - ${{ github.run_id }}
+        body: |
+          Logs da execução do workflow: ${{ github.run_id }}
+        draft: false
+        prerelease: true
+        artifacts: build.log
 ```
 
  * Certifique-se de que o arquivo build_env.sh esteja na raiz do seu repositório.
