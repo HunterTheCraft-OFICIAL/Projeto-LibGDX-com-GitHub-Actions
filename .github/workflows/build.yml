@@ -26,6 +26,15 @@ jobs:
       id: build_script
       run: ./build_env.sh
 
+    - name: Check for APK ZIP
+      id: check_apk
+      run: |
+        if [ -f meu-jogo-debug.apk.zip ]; then
+          echo "APK_EXISTS=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "APK_EXISTS=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Upload Project ZIP
       uses: actions/upload-artifact@v4
       with:
@@ -33,7 +42,7 @@ jobs:
         path: ${{ steps.build_script.outputs.LOG_FILE == '' && 'meu-jogo-libgdx.zip' || 'meu-jogo-libgdx.zip' }}
 
     - name: Upload APK ZIP (se gerado)
-      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && -f meu-jogo-debug.apk.zip
+      if: steps.build_script.outcome == 'success' && steps.build_script.outputs.LOG_FILE == '' && steps.check_apk.outputs.APK_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: apk-zip
