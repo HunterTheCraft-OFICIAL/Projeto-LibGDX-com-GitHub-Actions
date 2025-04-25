@@ -64,7 +64,7 @@ jobs:
         name: build-logs
         path: build.log
 
-    - name: Create Release (with Logs)
+    - name: Create Release (with Log Mention)
       if: always() # Executa sempre, mesmo que as etapas anteriores falhem
       uses: actions/create-release@v1
       env:
@@ -74,6 +74,7 @@ jobs:
         release_name: Build Log - ${{ github.run_id }}
         body: |
           Logs da execução do workflow: ${{ github.run_id }}
+
+          Você pode encontrar o arquivo de log completo como um artefato na página desta execução do workflow.
         draft: false
         prerelease: true
-        artifacts: build.log
