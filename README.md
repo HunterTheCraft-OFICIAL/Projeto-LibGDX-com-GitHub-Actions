@@ -145,7 +145,7 @@ jobs:
         java-version: '17' # Ou outra versão compatível
 
     - name: Download LibGDX Liftoff
-      run: wget https://github.com/libgdx/libgdx/releases/download/1.13.1/gdx-liftoff-1.13.1.jar # Use a versão mais recente
+      run: wget https://github.com/libgdx/gdx-liftoff/releases/download/v1.13.1.3/gdx-liftoff-1.13.1.3.jar
 
     - name: Make script executable
       run: chmod +x build_env.sh
@@ -192,7 +192,7 @@ jobs:
         name: build-logs
         path: build.log
 
-    - name: Create Release (with Logs)
+    - name: Create Release (with Log Mention)
       if: always() # Executa sempre, mesmo que as etapas anteriores falhem
       uses: actions/create-release@v1
       env:
@@ -202,9 +202,10 @@ jobs:
         release_name: Build Log - ${{ github.run_id }}
         body: |
           Logs da execução do workflow: ${{ github.run_id }}
+
+          Você pode encontrar o arquivo de log completo como um artefato na página desta execução do workflow.
         draft: false
         prerelease: true
-        artifacts: build.log
 ```
 
  * Certifique-se de que o arquivo build_env.sh esteja na raiz do seu repositório.

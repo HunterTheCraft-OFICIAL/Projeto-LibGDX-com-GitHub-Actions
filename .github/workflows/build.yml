@@ -17,7 +17,7 @@ jobs:
         java-version: '17' # Ou outra versão compatível
 
     - name: Download LibGDX Liftoff
-      run: wget https://github.com/libgdx/libgdx/releases/download/1.13.1/gdx-liftoff-1.13.1.jar # Use a versão mais recente
+      run: wget https://github.com/libgdx/gdx-liftoff/releases/download/v1.13.1.3/gdx-liftoff-1.13.1.3.jar
 
     - name: Make script executable
       run: chmod +x build_env.sh
