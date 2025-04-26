@@ -150,7 +150,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: seu-usuario/gdx-liftoff-env:latest # Substitua pelo seu usuário/imagem:tag
+      image: ubuntu:latest # Ou sua imagem, dependendo do teste
 
     steps:
     - name: Checkout repository
@@ -158,15 +158,19 @@ jobs:
 
     - name: Start Xvfb
       run: Xvfb :99 -screen 0 1024x768x24 &
+      if: always() # Executar mesmo em caso de falha anterior
 
     - name: Wait for Xvfb
       run: sleep 5
+      if: always()
 
     - name: Download LibGDX Liftoff (se não estiver no repo)
       run: wget -O gdx-setup.jar https://github.com/libgdx/gdx-liftoff/releases/download/1.13.1.3/gdx-liftoff-1.13.1.3.jar
+      if: always()
 
     - name: Make script executable
       run: chmod +x build_env.sh
+      if: always()
 
     - name: Run build script and collect info
       id: build_script
@@ -174,12 +178,14 @@ jobs:
         export DISPLAY=:99
         ./build_env.sh > build.log 2>&1
         cat build.log
+      if: always()
 
     - name: Upload Log File
       uses: actions/upload-artifact@v4
       with:
         name: build-log
         path: build.log
+      if: always()
 
     - name: Check for Project ZIP
       id: check_project_zip
@@ -189,9 +195,10 @@ jobs:
         else
           echo "PROJECT_ZIP_EXISTS=false" >> "$GITHUB_OUTPUT"
         fi
+      if: always()
 
     - name: Upload Project ZIP (se criado)
-      if: steps.build_script.outcome == 'success' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
+      if: always() && steps.build_script.outcome == 'success' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: project-zip
@@ -205,9 +212,10 @@ jobs:
         else
           echo "APK_EXISTS=false" >> "$GITHUB_OUTPUT"
         fi
+      if: always()
 
     - name: Upload APK (se gerado)
-      if: steps.build_script.outcome == 'success' && steps.check_apk.outputs.APK_EXISTS == 'true'
+      if: always() && steps.build_script.outcome == 'success' && steps.check_apk.outputs.APK_EXISTS == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: debug-apk
@@ -218,6 +226,7 @@ jobs:
       with:
         name: liftoff-jar
         path: gdx-setup.jar
+      if: always()
 
     - name: Create Release (with Log Mention)
       if: always()
@@ -236,6 +245,18 @@ jobs:
           ${{ steps.check_apk.outputs.APK_EXISTS == 'true' && 'O APK de debug está disponível como um artefato (debug-apk).' || '' }}
         draft: false
         prerelease: true
+
+    - name: Diagnostic Info (if container failed)
+      if: failure()
+      run: |
+        echo "--- Diagnostic Information (Container Failure) ---"
+        echo "Docker Info:"
+        docker info
+        echo "Docker Logs (if applicable):"
+        # Pode ser difícil obter logs de um container que não iniciou corretamente
+        echo "Environment Variables:"
+        env
+        echo "--- End of Diagnostic Information ---"
 ```
 
  * Certifique-se de que o arquivo build_env.sh esteja na raiz do seu repositório.
