@@ -149,22 +149,21 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: seu-usuario/gdx-liftoff-env:latest # Substitua pelo seu usuário/imagem:tag
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+    - name: Start Xvfb
+      run: Xvfb :99 -screen 0 1024x768x24 &
 
-    - name: Install 'tree'
-      run: sudo apt-get update && sudo apt-get install -y tree # Instala o 'tree' para o log
+    - name: Wait for Xvfb
+      run: sleep 5
 
-    - name: Download LibGDX Liftoff
-      run: wget https://github.com/libgdx/gdx-liftoff/releases/download/v1.13.1.3/gdx-liftoff-1.13.1.3.jar -O gdx-setup.jar
+    - name: Download LibGDX Liftoff (se não estiver no repo)
+      run: wget -O gdx-setup.jar https://github.com/libgdx/gdx-liftoff/releases/download/1.13.1.3/gdx-liftoff-1.13.1.3.jar
 
     - name: Make script executable
       run: chmod +x build_env.sh
@@ -172,8 +171,9 @@ jobs:
     - name: Run build script and collect info
       id: build_script
       run: |
-        ./build_env.sh
-        cat build.log # Exibe o conteúdo do build.log no output do workflow
+        export DISPLAY=:99
+        ./build_env.sh > build.log 2>&1
+        cat build.log
 
     - name: Upload Log File
       uses: actions/upload-artifact@v4
