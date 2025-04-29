@@ -6,6 +6,7 @@
 PROJECT_NAME="meu-jogo-libgdx"
 OUTPUT_ZIP="${PROJECT_NAME}.zip"
 LOG_FILE="build.log"
+ANDROID_SDK_PATH="/opt/android-sdk" # Caminho esperado no container
 
 # --- Funções ---
 
@@ -14,31 +15,32 @@ log() {
   echo "[${TIMESTAMP}] $1"
 }
 
-collect_environment_info() {
-  log "--- Informações do Ambiente ---"
-  log "Sistema Operacional: $(uname -a)"
-  log "Java Version: $(java -version 2>&1)"
-  log "Gradle Version: $(./gradlew --version 2>&1)" # Tenta obter a versão do Gradle (se existir)
-  log "Estrutura de diretórios:"
-  tree -L 2 . # Lista a estrutura de diretórios (requer 'tree' instalado)
-  log "--- Downloads ---"
-  ls -l gdx-setup.jar # Lista informações do arquivo baixado
-  log "-----------------------------"
+# Verificar se o Android SDK está presente (opcional)
+check_android_sdk() {
+  if [ -d "$ANDROID_SDK_PATH" ]; then
+    log "Android SDK encontrado em: $ANDROID_SDK_PATH"
+    return 0
+  else
+    log "Aviso: Android SDK não encontrado no caminho esperado: $ANDROID_SDK_PATH"
+    return 1
+  fi
 }
 
 create_libgdx_project() {
-  log "Iniciando a criação do projeto LibGDX (não interativo)..."
+  log "Iniciando a criação do projeto LibGDX (não interativo) dentro do Docker..."
   if ! command -v java &> /dev/null; then
-    log "Erro: Java não encontrado no sistema. A criação do projeto LibGDX requer Java."
+    log "Erro: Java não encontrado no sistema (dentro do container)."
     return 1
   fi
 
   java -jar gdx-setup.jar \
-    -name "$PROJECT_NAME" \
-    -package com.meugame \
-    -mainClass MeuJogo \
-    -backends desktop,android,ios,web \
-    -extensions extensions/controllers,extensions/freetype,extensions/ashley,extensions/bullet
+    --dir="$PROJECT_NAME" \
+    --name="$PROJECT_NAME" \
+    --package="com.meugame" \
+    --mainClass="MeuJogo" \
+    --sdk="$ANDROID_SDK_PATH" \
+    --platforms="desktop,android,ios,web" \
+    --extensions="extensions/controllers,extensions/freetype,extensions/ashley,extensions/bullet"
 
   if [ $? -eq 0 ]; then
     log "Projeto LibGDX criado com sucesso na pasta '$PROJECT_NAME'."
@@ -92,21 +94,19 @@ build_apk() {
 
 # --- Execução Principal ---
 
-log "Início do script de criação do ambiente de desenvolvimento."
+log "Início do script de build dentro do Docker."
 
-# Coletar informações do ambiente
-collect_environment_info
+# Verificar o Android SDK (opcional)
+check_android_sdk
 
 # Criar o projeto LibGDX
 if create_libgdx_project; then
   # Compactar o projeto
   zip_project
-
-  # Tentar compilar o APK
-  build_apk
-else
-  log "A criação do projeto LibGDX falhou. As etapas subsequentes serão ignoradas."
 fi
+
+# Tentar compilar o APK (vamos manter isso por enquanto)
+build_apk
 
 log "Fim do script. O log detalhado foi salvo em '$LOG_FILE'."
 
