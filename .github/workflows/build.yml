@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:latest # Ou sua imagem, dependendo do teste
+      image: seu-usuario/gdx-liftoff-env:latest # Sua imagem Docker
 
     steps:
     - name: Checkout repository
@@ -17,19 +17,15 @@ jobs:
 
     - name: Start Xvfb
       run: Xvfb :99 -screen 0 1024x768x24 &
-      if: always() # Executar mesmo em caso de falha anterior
 
     - name: Wait for Xvfb
       run: sleep 5
-      if: always()
 
     - name: Download LibGDX Liftoff (se não estiver no repo)
       run: wget -O gdx-setup.jar https://github.com/libgdx/gdx-liftoff/releases/download/1.13.1.3/gdx-liftoff-1.13.1.3.jar
-      if: always()
 
     - name: Make script executable
       run: chmod +x build_env.sh
-      if: always()
 
     - name: Run build script and collect info
       id: build_script
@@ -37,82 +33,24 @@ jobs:
         export DISPLAY=:99
         ./build_env.sh > build.log 2>&1
         cat build.log
-      if: always()
 
     - name: Upload Log File
       uses: actions/upload-artifact@v4
       with:
         name: build-log
         path: build.log
-      if: always()
 
     - name: Check for Project ZIP
       id: check_project_zip
-      run: |
-        if [ -f meu-jogo-libgdx.zip ]; then
-          echo "PROJECT_ZIP_EXISTS=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "PROJECT_ZIP_EXISTS=false" >> "$GITHUB_OUTPUT"
-        fi
-      if: always()
-
+      # ... (rest of your workflow)
     - name: Upload Project ZIP (se criado)
-      if: always() && steps.build_script.outcome == 'success' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: project-zip
-        path: meu-jogo-libgdx.zip
-
+      # ...
     - name: Check for APK
-      id: check_apk
-      run: |
-        if [ -f meu-jogo-debug.apk ]; then
-          echo "APK_EXISTS=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "APK_EXISTS=false" >> "$GITHUB_OUTPUT"
-        fi
-      if: always()
-
+      # ...
     - name: Upload APK (se gerado)
-      if: always() && steps.build_script.outcome == 'success' && steps.check_apk.outputs.APK_EXISTS == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: debug-apk
-        path: meu-jogo-debug.apk
-
+      # ...
     - name: Upload Liftoff JAR
-      uses: actions/upload-artifact@v4
-      with:
-        name: liftoff-jar
-        path: gdx-setup.jar
-      if: always()
-
+      # ...
     - name: Create Release (with Log Mention)
-      if: always()
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.run_id }}
-        release_name: Build Log - ${{ github.run_id }}
-        body: |
-          Logs da execução do workflow: ${{ github.run_id }}
-
-          Você pode encontrar o arquivo de log completo como um artefato ('build-log') na página desta execução do workflow.
-          O JAR do Liftoff também está disponível como um artefato ('liftoff-jar').
-          ${{ steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true' && 'O ZIP do projeto está disponível como um artefato (project-zip).' || '' }}
-          ${{ steps.check_apk.outputs.APK_EXISTS == 'true' && 'O APK de debug está disponível como um artefato (debug-apk).' || '' }}
-        draft: false
-        prerelease: true
-
-    - name: Diagnostic Info (if container failed)
-      if: failure()
-      run: |
-        echo "--- Diagnostic Information (Container Failure) ---"
-        echo "Docker Info:"
-        docker info
-        echo "Docker Logs (if applicable):"
-        # Pode ser difícil obter logs de um container que não iniciou corretamente
-        echo "Environment Variables:"
-        env
-        echo "--- End of Diagnostic Information ---"
+      # ...
+    ```
