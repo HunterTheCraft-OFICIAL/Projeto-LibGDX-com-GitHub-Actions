@@ -1,96 +1,126 @@
-name: Build LibGDX Environment (Docker)
+name: Build LibGDX Project (via Docker in Actions)
 
-on: [push]
-
-permissions:
-  contents: write
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-run:
     runs-on: ubuntu-latest
-    container:
-      image: seu-usuario/gdx-liftoff-env:latest # Substitua pelo seu usuário/imagem:tag
+    # Permissões podem ser necessárias para cache GHA (geralmente padrão ok)
+    # permissions:
+    #   contents: read
+    #   packages: write # Se fosse enviar para GHCR
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
 
-    - name: Start Xvfb
-      run: Xvfb :99 -screen 0 1280x1024x24 &
+      - name: Set up Docker Buildx
+        id: buildx # Dá um ID para referenciar outputs se necessário
+        uses: docker/setup-buildx-action@v3
 
-    - name: Wait for Xvfb
-      run: sleep 5
+      - name: Build Docker Image from Dockerfile
+        id: docker_build # Dá um ID para referenciar outputs se necessário
+        uses: docker/build-push-action@v5
+        with:
+          context: . # Diretório raiz do repo (onde está o Dockerfile)
+          file: ./Dockerfile # Caminho para o seu Dockerfile
+          # NÃO faz push para registry, apenas constrói e carrega no daemon local
+          push: false
+          load: true
+          # Define uma tag para referenciar a imagem localmente nos próximos passos
+          tags: local/libgdx-builder:latest
+          # ATIVA O CACHE! Essencial para velocidade em execuções futuras
+          cache-from: type=gha # Tenta puxar cache do GitHub Actions Cache
+          cache-to: type=gha,mode=max # Salva o cache no GitHub Actions Cache
 
-    - name: Make script executable
-      run: chmod +x build_env.sh
+      # --- Executar comandos DENTRO do container recém-construído ---
+      # Usaremos 'docker run' para cada grupo lógico de comandos
 
-    - name: Run build script and collect info
-      id: build_script
-      run: |
-        export DISPLAY=:99
-        ./build_env.sh > build.log 2>&1
-        cat build.log
-      env:
-        ANDROID_SDK_ROOT: /opt/android-sdk # Garante que a variável esteja definida no ambiente
+      - name: Run Build Steps inside Docker Container
+        env:
+          # Passa segredos para assinatura (se necessário para release)
+          # Certifique-se que estes segredos existem no seu repositório GitHub
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "Starting build inside the container..."
 
-    - name: Upload Log File
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log
-        path: build.log
+          # Comando complexo executado dentro do container via 'sh -c'
+          # Monta o workspace atual (-v) e define o diretório de trabalho (-w)
+          # --rm remove o container após a execução
+          docker run --rm \
+            -v ${{ github.workspace }}:/github/workspace \
+            -w /github/workspace \
+            -e DISPLAY \
+            -e KEYSTORE_BASE64 \
+            -e KEYSTORE_PASSWORD \
+            -e KEY_ALIAS \
+            -e KEY_PASSWORD \
+            local/libgdx-builder:latest \
+            sh -c ' \
+              echo "--- Running inside container ---" && \
+              # Inicia Xvfb em background
+              Xvfb :99 -screen 0 1024x768x24 & \
+              echo "Xvfb started." && \
+              sleep 5 && \
+              echo "Granting gradlew permissions..." && \
+              chmod +x ./gradlew && \
+              echo "Running general build..." && \
+              ./gradlew build && \
+              echo "Running Android debug build..." && \
+              ./gradlew android:assembleDebug && \
+              # Bloco para Build Release (Condicionalmente ou sempre tentar)
+              if [ -n "$KEYSTORE_BASE64" ]; then \
+                echo "Attempting Android release build..."; \
+                echo "Decoding keystore..."; \
+                echo "$KEYSTORE_BASE64" | base64 --decode > /tmp/release.keystore && \
+                echo "Running gradlew assembleRelease..."; \
+                ./gradlew android:assembleRelease \
+                  -Psigning.keyAlias="$KEY_ALIAS" \
+                  -Psigning.keyPassword="$KEY_PASSWORD" \
+                  -Psigning.storePassword="$KEYSTORE_PASSWORD" \
+                  -Psigning.storeFile=/tmp/release.keystore || echo "Release build failed or skipped."; \
+              else \
+                echo "Skipping release build: Keystore secret not found."; \
+              fi && \
+              echo "--- Container execution finished ---" \
+            '
 
-    - name: Check for Project ZIP
-      id: check_project_zip
-      run: |
-        if [ -f meu-jogo-libgdx.zip ]; then
-          echo "PROJECT_ZIP_EXISTS=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "PROJECT_ZIP_EXISTS=false" >> "$GITHUB_OUTPUT"
-        fi
+      - name: List Output Files
+        run: |
+          echo "Listing generated files..."
+          # Lista arquivos gerados no workspace do runner (que foi montado no container)
+          tree android/build/outputs/apk/ || echo "APK output directory not found."
+          tree desktop/build/libs/ || echo "Desktop output directory not found."
+          # Adicione outros diretórios de saída conforme necessário
 
-    - name: Upload Project ZIP (se criado)
-      if: steps.build_script.outcome == 'success' && steps.check_project_zip.outputs.PROJECT_ZIP_EXISTS == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: project-zip
-        path: meu-jogo-libgdx.zip
+      # --- Upload de Artefatos ---
+      # Os arquivos estão no workspace do runner porque o diretório foi montado no container
 
-    - name: Check for APK
-      id: check_apk
-      run: |
-        if [ -f meu-jogo-debug.apk ]; then
-          echo "APK_EXISTS=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "APK_EXISTS=false" >> "$GITHUB_OUTPUT"
-        fi
+      - name: Upload Desktop Jar Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-jar
+          path: desktop/build/libs/*.jar # Ajuste o path/padrão
+          if-no-files-found: warn # Não falha se não encontrar
 
-    - name: Upload APK (se gerado)
-      if: steps.build_script.outcome == 'success' && steps.check_apk.outputs.APK_EXISTS == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: debug-apk
-        path: meu-jogo-debug.apk
+      - name: Upload Android Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/build/outputs/apk/debug/*.apk # Ajuste o path/padrão
+          if-no-files-found: warn # Não falha se não encontrar
 
-    - name: Upload Liftoff JAR
-      uses: actions/upload-artifact@v4
-      with:
-        name: liftoff-jar
-        path: gdx-setup.jar
-
-    - name: Create Release (with Log Mention)
-      if: always()
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.run_id }}-docker
-        release_name: Build Log (Docker) - ${{ github.run_id }}
-        body: |
-          Logs da execução do workflow com Docker: ${{ github.run_id }}
-
-          Você pode encontrar o arquivo de log completo como um artefato ('build-log') na página desta execução do workflow.
-          O ZIP do projeto (se criado) está disponível como 'project-zip'.
-          O APK de debug (se gerado) está disponível como 'debug-apk'.
-          O JAR do Liftoff também está disponível como 'liftoff-jar'.
-        draft: false
-        prerelease: true
+      - name: Upload Android Release APK Artifact
+        # if: github.ref == 'refs/heads/main' # Condicional se só builda release na main
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: android/build/outputs/apk/release/*.apk # Ajuste o path/padrão
+          if-no-files-found: warn # Não falha se não encontrar
