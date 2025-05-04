@@ -1,0 +1,118 @@
+name: Build LibGDX Project
+
+on:
+  push:
+    branches: [ main ] # Gatilho em push para a branch main
+  workflow_dispatch: # Permite gatilho manual
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: # Permissões necessárias para upload de artefatos
+      contents: read
+      # actions: write # Não necessário para upload-artifact v4
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: . # Diretório onde está o Dockerfile
+          file: ./Dockerfile # Caminho para o Dockerfile
+          push: false # Não envia para um registry
+          load: true # Carrega a imagem localmente para ser usada nos próximos steps
+          tags: gdx-builder:latest # Nome da imagem local
+          cache-from: type=gha # Habilita cache do GitHub Actions
+          cache-to: type=gha,mode=max # Salva o cache para futuras execuções
+
+      - name: Initialize Log File
+        run: echo "Starting LibGDX Build Process - $(date)" > build_log.txt
+
+      - name: Create LibGDX Project Structure
+        run: |
+          echo "--- Creating LibGDX Project ---" | tee -a build_log.txt
+          # Monta o diretório atual (-v) e define o workdir (-w) dentro do container
+          # Executa comandos dentro do container usando bash
+          docker run --rm \
+            -v "$(pwd):/github/workspace" \
+            -w /github/workspace \
+            gdx-builder:latest \
+            bash -c 'set -e pipefail # Fail fast on errors
+
+            # Inicia o Xvfb em background no display :99
+            Xvfb :99 -screen 0 1024x768x16 &
+            export DISPLAY=:99
+            sleep 5 # Dê um tempo para o Xvfb iniciar completamente
+
+            echo "Running gdx-liftoff..." | tee -a /github/workspace/build_log.txt
+            # Use java -jar com o caminho completo ou o alias criado
+            java -jar /usr/local/bin/gdx-liftoff.jar \
+              --dir . \
+              --project "MyGdxGame" \
+              --package "com.mygdx.game" \
+              --mainClass "Main" \
+              --sdk "${ANDROID_SDK_ROOT}" \
+              --platforms "android" "desktop" \
+              --androidApi "${ANDROID_API_LEVEL}" \
+              --extensions=[] \
+              --nonInteractive \
+              --gdxVersion "1.12.1" \
+              2>&1 | tee -a /github/workspace/build_log.txt # Redireciona stdout e stderr para o log
+
+            echo "Project structure created. Listing files:" | tee -a /github/workspace/build_log.txt
+            tree MyGdxGame | tee -a /github/workspace/build_log.txt
+
+            # Mata o processo Xvfb (opcional, o container será removido de qualquer forma)
+            # pkill Xvfb
+            '
+        # Não podemos usar `tee` diretamente no comando `run:` do Actions para capturar a saída do docker run para o arquivo host
+        # A saída já é redirecionada para o log do Actions e para o arquivo dentro do container pelo `tee` no comando `bash -c`.
+
+      - name: Compile Android APK (Debug)
+        run: |
+          echo "--- Compiling Android APK ---" | tee -a build_log.txt
+          docker run --rm \
+            -v "$(pwd):/github/workspace" \
+            -w /github/workspace/MyGdxGame \
+            gdx-builder:latest \
+            bash -c 'set -e pipefail # Fail fast on errors
+
+            echo "Making gradlew executable..." | tee -a /github/workspace/build_log.txt
+            chmod +x ./gradlew
+
+            echo "Running Gradle build..." | tee -a /github/workspace/build_log.txt
+            ./gradlew android:assembleDebug \
+              2>&1 | tee -a /github/workspace/build_log.txt # Redireciona stdout e stderr
+
+            echo "Build finished. Listing generated APK:" | tee -a /github/workspace/build_log.txt
+            tree android/build/outputs/apk/debug | tee -a /github/workspace/build_log.txt || echo "APK not found at expected location."
+            '
+
+      - name: Package Project Structure (Optional)
+        if: success() # Executa apenas se os passos anteriores foram bem-sucedidos
+        run: |
+          echo "--- Packaging Project Structure ---" | tee -a build_log.txt
+          zip -r project_structure.zip MyGdxGame \
+            -x "MyGdxGame/android/build/*" \
+            -x "MyGdxGame/android/.gradle/*" \
+            -x "MyGdxGame/desktop/build/*" \
+            -x "MyGdxGame/.gradle/*" \
+            -x "MyGdxGame/.idea/*" \
+            -x "*.iml" \
+          | tee -a build_log.txt
+          echo "Project structure packaged into project_structure.zip" | tee -a build_log.txt
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdx-build-artifacts
+          path: |
+            MyGdxGame/android/build/outputs/apk/debug/*.apk
+            build_log.txt
+            project_structure.zip # Inclua se a etapa de empacotamento for usada
+          retention-days: 7 # Dias para manter os artefatos (ajuste conforme necessário)
