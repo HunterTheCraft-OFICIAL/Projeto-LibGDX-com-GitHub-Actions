@@ -8,8 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
+    permissions: # Permissões necessárias para upload de artefatos
       contents: read
+      # actions: write # Não necessário para upload-artifact v4
 
     steps:
       - name: Checkout Repository
@@ -21,19 +22,20 @@ jobs:
       - name: Build Docker Image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: gdx-builder:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          context: . # Diretório onde está o Dockerfile
+          file: ./Dockerfile # Caminho para o Dockerfile
+          push: false # Não envia para um registry
+          load: true # Carrega a imagem localmente para ser usada nos próximos steps
+          tags: gdx-builder:latest # Nome da imagem local
+          cache-from: type=gha # Habilita cache do GitHub Actions
+          cache-to: type=gha,mode=max # Salva o cache para futuras execuções
 
       - name: Initialize Log File
         run: echo "Starting LibGDX Build Process - $(date)" > build_log.txt
 
-      # Etapa com debugging aprimorado da interação anterior
+      # Passo Atualizado com o script mais detalhado
       - name: Create LibGDX Project Structure
+        # Adiciona um ID para facilitar a referência se necessário (opcional)
         id: create_project
         run: |
           echo "--- Creating LibGDX Project ---" | tee -a build_log.txt
@@ -110,66 +112,41 @@ jobs:
           echo "--- Compiling Android APK ---" | tee -a build_log.txt
           docker run --rm \
             -v "$(pwd):/github/workspace" \
-            # MUITO IMPORTANTE: Definir o workdir correto dentro do projeto gerado
             -w /github/workspace/MyGdxGame \
             gdx-builder:latest \
-            bash -c '
-            set -e pipefail # Fail fast on errors
+            bash -c 'set -e pipefail # Fail fast on errors
 
-            echo "[Container] Current directory: $(pwd)" | tee -a /github/workspace/build_log.txt
-            echo "[Container] Making gradlew executable..." | tee -a /github/workspace/build_log.txt
+            echo "Making gradlew executable..." | tee -a /github/workspace/build_log.txt
             chmod +x ./gradlew
 
-            echo "[Container] Running Gradle build (android:assembleDebug)..." | tee -a /github/workspace/build_log.txt
-            # Execute o gradle e logue a saída
-            ./gradlew android:assembleDebug >> /github/workspace/build_log.txt 2>&1
+            echo "Running Gradle build..." | tee -a /github/workspace/build_log.txt
+            ./gradlew android:assembleDebug \
+              2>&1 | tee -a /github/workspace/build_log.txt # Redireciona stdout e stderr
 
-            GRADLE_EXIT_CODE=$?
-            echo "[Container] Gradle build finished with exit code: $GRADLE_EXIT_CODE" | tee -a /github/workspace/build_log.txt
-
-            echo "[Container] Build finished. Listing generated APK:" | tee -a /github/workspace/build_log.txt
-            # Use find para localizar o APK de forma mais robusta
-            find android/build/outputs/apk/debug -name "*.apk" -print -quit | tee -a /github/workspace/build_log.txt || echo "[Container] APK not found."
-
-            exit $GRADLE_EXIT_CODE
+            echo "Build finished. Listing generated APK:" | tee -a /github/workspace/build_log.txt
+            tree android/build/outputs/apk/debug | tee -a /github/workspace/build_log.txt || echo "APK not found at expected location."
             '
-          DOCKER_BUILD_EXIT_CODE=$?
-          echo "Docker build command finished with exit code: $DOCKER_BUILD_EXIT_CODE"
-          if [ $DOCKER_BUILD_EXIT_CODE -ne 0 ]; then
-            echo "::error::Docker build failed with exit code $DOCKER_BUILD_EXIT_CODE"
-            exit $DOCKER_BUILD_EXIT_CODE
-          fi
 
       - name: Package Project Structure (Optional)
         if: success() # Executa apenas se os passos anteriores foram bem-sucedidos
         run: |
           echo "--- Packaging Project Structure ---" | tee -a build_log.txt
-          # Verifica se o diretório MyGdxGame existe antes de tentar zipar
-          if [ -d "MyGdxGame" ]; then
-            zip -r project_structure.zip MyGdxGame \
-              -x "MyGdxGame/android/build/*" \
-              -x "MyGdxGame/android/.gradle/*" \
-              -x "MyGdxGame/desktop/build/*" \
-              -x "MyGdxGame/.gradle/*" \
-              -x "MyGdxGame/.idea/*" \
-              -x "*.iml" \
-            | tee -a build_log.txt
-            echo "Project structure packaged into project_structure.zip" | tee -a build_log.txt
-          else
-             echo "Skipping packaging: Directory MyGdxGame not found." | tee -a build_log.txt
-          fi
+          zip -r project_structure.zip MyGdxGame \
+            -x "MyGdxGame/android/build/*" \
+            -x "MyGdxGame/android/.gradle/*" \
+            -x "MyGdxGame/desktop/build/*" \
+            -x "MyGdxGame/.gradle/*" \
+            -x "MyGdxGame/.idea/*" \
+            -x "*.iml" \
+          | tee -a build_log.txt
+          echo "Project structure packaged into project_structure.zip" | tee -a build_log.txt
 
       - name: Upload Artifacts
-        # Executa mesmo se etapas anteriores falharem para podermos pegar o log
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gdx-build-artifacts-${{ github.run_number }}
+          name: gdx-build-artifacts
           path: |
-            # Tenta encontrar o APK, mas não falha se não existir
             MyGdxGame/android/build/outputs/apk/debug/*.apk
             build_log.txt
-            project_structure.zip # Inclui se o arquivo existir
-          # Permite que o upload continue mesmo se alguns arquivos não forem encontrados
-          if-no-files-found: warn
-          retention-days: 7
+            project_structure.zip # Inclua se a etapa de empacotamento for usada
+          retention-days: 7 # Dias para manter os artefatos (ajuste conforme necessário)

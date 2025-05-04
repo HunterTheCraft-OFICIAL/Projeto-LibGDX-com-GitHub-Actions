@@ -48,11 +48,10 @@ RUN yes | sdkmanager --licenses > /dev/null || true
 # Instale as plataformas e ferramentas de build necessárias
 RUN sdkmanager "platform-tools" "platforms;android-${ANDROID_API_LEVEL}" "build-tools;${ANDROID_BUILD_TOOLS_VERSION}"
 
-# Download do gdx-liftoff (CORRIGIDO)
+# Download do gdx-liftoff (verifique a URL/versão mais recente se necessário)
 # A versão pode ser encontrada nas releases do gdx-liftoff no GitHub
-# O repositório agora é libgdx/gdx-liftoff e o arquivo é liftoff.jar
 ENV GDX_LIFTOFF_VERSION 1.12.1.0
-RUN wget "https://github.com/libgdx/gdx-liftoff/releases/download/v${GDX_LIFTOFF_VERSION}/liftoff.jar" -O /usr/local/bin/gdx-liftoff.jar && \
+RUN wget "https://github.com/tommyettinger/gdx-liftoff/releases/download/v${GDX_LIFTOFF_VERSION}/gdx-liftoff.jar" -O /usr/local/bin/gdx-liftoff.jar && \
     chmod +x /usr/local/bin/gdx-liftoff.jar
 
 # Defina o diretório de trabalho padrão para corresponder ao workspace do GitHub Actions
