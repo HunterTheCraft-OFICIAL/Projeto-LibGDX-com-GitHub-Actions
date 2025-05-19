@@ -10,17 +10,6 @@ Este projeto demonstra como automatizar a criação, construção e empacotament
 - Cache de dependências Gradle para otimizar builds futuros.
 - Totalmente executado na nuvem com runners do GitHub Actions — sem necessidade de máquina local.
 
-## Estrutura
-
-```
-.github/
- ┣ workflows/
- ┃ ┗ build.yml              # Workflow de build automatizado
- ┗ scripts/
-   ┗ create-libgdx-project.sh  # Script que clona template LibGDX
-README.md                    # Este arquivo
-```
-
 ## Como usar
 
 1. Faça o fork ou clone deste repositório.
@@ -29,9 +18,8 @@ README.md                    # Este arquivo
 
 ## Observações
 
-- Certifique-se de que seu template LibGDX usa uma versão recente do Gradle e está funcional via CLI.
-- Se necessário, edite o script de geração para usar um fork personalizado do template LibGDX.
+- O projeto utiliza Gradle 8.5 para garantir compatibilidade com Java 17.
+- A estrutura inicial do projeto é baseada em um template LibGDX público.
 
 ---
-
 Criado para demonstrar uma pipeline moderna, 100% baseada em GitHub Actions.
