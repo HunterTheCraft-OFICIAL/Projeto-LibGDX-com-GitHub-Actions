@@ -1,0 +1,46 @@
+name: Generate LibGDX Project
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-project:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+
+      - name: ⬇️ Baixar gdx-setup.jar
+        run: |
+          curl -L -o gdx-setup.jar https://github.com/libgdx/libgdx/releases/download/1.12.1/gdx-setup.jar
+
+      - name: 🧱 Gerar projeto via CLI
+        run: |
+          java -jar gdx-setup.jar \
+            --dir my-libgdx-project \
+            --name MyGame \
+            --package com.mygame \
+            --mainClass MyGame \
+            --sdkLocation ./android-sdk \
+            --excludeModules android,ios \
+            --force
+
+      - name: 📦 Compactar projeto
+        run: zip -r my-libgdx-project.zip my-libgdx-project
+
+      - name: 📎 Upload do artefato
+        uses: actions/upload-artifact@v3
+        with:
+          name: libgdx-project
+          path: my-libgdx-project.zip
+
+      - name: 🚀 Criar Release automático
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: generated-project-v${{ github.run_number }}
+          files: my-libgdx-project.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
